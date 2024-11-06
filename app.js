@@ -5,8 +5,12 @@ require('dotenv').config();
 const username = process.env.JANDI_USERNAME || 'root';
 const password = process.env.JANDI_PASSWORD || '';
 const ignore_topics = process.env.JANDI_IGNORE_TOPICS.split(',') || '';
+const ignore_chats  = process.env.JANDI_IGNORE_CHATS.split(',') || '';
 const download = process.env.JANDI_DOWNLOAD || '';
-const NUM_PAGEUP = 20;
+const NUM_PAGEUP = 3;
+const MAX_RETRY  = 5;
+const SLEEP_MINOR = 100;
+const SLEEP_MAJOR = 1000;
 let _messages = {}; 
 
 /////////////////////////////////////////////
@@ -33,28 +37,42 @@ const driver = new Builder()
 .build();
 
 
+function sortOnKeys(dict) {
+    var sorted = [];
+    for(var key in dict) {
+        sorted[sorted.length] = key;
+    }
+    sorted.sort();
 
+    var tempDict = {};
+    for(var i = 0; i < sorted.length; i++) {
+        tempDict[sorted[i]] = dict[sorted[i]];
+    }
 
+    return tempDict;
+}
 async function loopPageUpKey (count=5) {
     let actions = driver.findElement (By.css ("body"))
 
     for (var i = 0; i < count; i++) {
         await actions.sendKeys(Key.PAGE_UP);
+        await driver.sleep (SLEEP_MINOR);            
     }
 }
 
 async function topicRoomEntrance (topicId, topicNm) {
-    console.log('- ' + topicId.split("-")[1] + ':' + topicNm.trim());
+    _messages = {}; 
+    console.log(topicId.split("-")[1] + ':' + topicNm.trim());
     await driver.findElement (By.id (topicId)).click()
 
-    for (;;) {
+    for (let retry = 0; retry < MAX_RETRY; retry++) {
+        if (retry > 0) await driver.sleep (SLEEP_MAJOR); 
         let messages = await driver.findElements (By.className("_message present"));
-        //messages = messages.reverse()
-        let messageN = messages.length;
-        console.log('[messages.length]', messageN, '[_messages.length]', Object.keys(_messages).length);
+        let messageN = messages.length;  //messages = messages.reverse()
+        console.log('[retry]', retry, '[messages.length]', messageN, '[_messages.length]', Object.keys(_messages).length);
 
         for (var i = 0, prev = ""; i < messages.length; i++) {
-            let id   = await messages[i].getAttribute("id");
+            let id = await messages[i].getAttribute("id");
 
             ///////////////////////////////////////////////////////
             // check duplicated message
@@ -63,12 +81,20 @@ async function topicRoomEntrance (topicId, topicNm) {
 
             if (id in _messages) continue;
 
+            retry   = 0;
+            updated = true; 
+
             let _sys = false;
             let msg  = '';
             let time = '';
             let name = '';
 
-            try { msg  = await messages[i].findElement (By.className("msg-text-box")).getText(); } catch (e) { _sys = true; }
+            //try { msg  = await messages[i].findElement (By.className("msg-text-box")).getText(); } catch (e) { _sys = true; }
+            try { msg  = await messages[i].findElement (By.className("msg-item")).getText(); } 
+            catch (e) { 
+                try { msg  = await messages[i].findElement (By.className("info-title")).getText(); }
+                catch (e) { _sys = true; }
+            }
 
             if (_sys) {
                 msg = await messages[i].findElement (By.className("msg-system")).getText();
@@ -112,12 +138,11 @@ async function topicRoomEntrance (topicId, topicNm) {
 
             _messages[id] = { 'name': name, 'time': time, 'msg': msg};
         }
-        await loopPageUpKey (NUM_PAGEUP);
-
-        if (prev != 0 && prev == messageN) break;
-        prev = messageN;
+        await loopPageUpKey (NUM_PAGEUP);      
     }
-
+    //_messages = sortOnKeys(_messages);
+    //console.log (_messages);
+    await driver.sleep (SLEEP_MAJOR); 
 
     //const messages = driver.findElement (By.id ("msgs_container"))
     //let deltaY = (await messages.getRect()).y
@@ -130,16 +155,19 @@ async function topicRoom () {
     //////////////////////////////////////////////////////////////////////////////////////
     // Topic Room
 
-    let resultRooms  = await driver.findElements(By.className("lnb-list-item _topicItem"));
+    var resultRooms  = await driver.findElements(By.className("lnb-list-item _topicItem"));
     console.log('[resultTopicRooms.length]', resultRooms.length)
+    console.log (ignore_topics);
 
-    for (var i = 0; i < resultRooms.length; i++) {
+    let ncount = resultRooms.length;
+
+    //for (var i = 0; i < resultRooms.length; i++) {
+    for (var i = 0; i < ncount; i++) {
+        var resultRooms  = await driver.findElements(By.className("lnb-list-item _topicItem")); // re-init 'StaleElementReferenceError'
+
         let topicId = await resultRooms[i].getAttribute("id");
         //let topicNm = await resultRooms[i].findElement (By.className ("lnb-item-name")).getAttribute("textContent");
         let topicNm = await resultRooms[i].findElement (By.className ("lnb-item-name")).getText();
-
-        console.log (ignore_topics);
-
         let ignore = false;
         for (var j = 0; j < ignore_topics.length; j++) {
             if (topicNm.indexOf(ignore_topics[j].trim(), 0) >= 0) ignore = true;
@@ -154,14 +182,28 @@ async function dmRoom () {
     // DM Room
 
     let resultRooms  = await driver.findElements(By.className("lnb-list-item _dmItem"));
-    console.log('[resultDmRooms.length]', resultRooms.length)
+    console.log('[resultRooms.length]', resultRooms.length)
+    console.log (ignore_chats);
 
-    for (var i = 0; i < resultRooms.length; i++) {
-        var topicId = await resultRooms[i].getAttribute("id");
-        var topicNm = await resultRooms[i].findElement (By.className ("member-names")).getAttribute("textContent");
-        console.log('- ' + topicId.split("-")[1] + ':' + topicNm.trim())
+    let ncount = resultRooms.length;
+
+    //for (var i = 0; i < resultDmRooms.length; i++) {
+    for (var i = 0; i < ncount; i++) {
+        let resultRooms  = await driver.findElements(By.className("lnb-list-item _dmItem")); // re-init 'StaleElementReferenceError'
+        let topicId = await resultRooms[i].getAttribute("id");
+        //var topicNm = await resultDmRooms[i].findElement (By.className ("member-names")).getAttribute("textContent");
+        let topicNm = await resultRooms[i].findElement (By.className ("member-names")).getText();
+        let ignore = false;
+        for (var j = 0; j < ignore_chats.length; j++) {
+            if (topicNm.indexOf(ignore_chats[j].trim(), 0) >= 0) ignore = true;
+        }
+        console.log (topicId, topicNm);
+        //continue;
+        if (ignore == false) { await topicRoomEntrance (topicId, topicNm); }
     }    
     console.log ('-----------------------------------------------') 
+
+
 }
 
 async function jandi () {
@@ -187,7 +229,7 @@ async function jandi () {
         console.log ("JANDI: main pannel entrance success")
 
         await topicRoom ();
-        //await dmRoom ();
+        await dmRoom ();
 
         //await driver.findElement(By.name('q')).sendKeys('You did it!!', Key.RETURN);
         //await driver.wait(until.titleIs('You did it!! - Google Search'), 1000);
