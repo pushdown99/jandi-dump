@@ -1,17 +1,25 @@
-const {Builder, By, Key, until} = require('D:\\workspaces\\node\\jandi\\node_modules\\selenium-webdriver');
-const chrome = require('D:\\workspaces\\node\\jandi\\node_modules\\selenium-webdriver\\chrome');
-
+//const {Builder, By, Key, until} = require('D:\\workspaces\\node\\jandi\\node_modules\\selenium-webdriver');
 require('dotenv').config();
+
+let isWin = process.platform === "win32";
+const pwd = process.cwd();
+const webdriver = (isWin)? pwd + '\\node_modules\\selenium-webdriver' : pwd + '/node_modulws/selenium-webdriver';
 const username = process.env.JANDI_USERNAME || 'root';
 const password = process.env.JANDI_PASSWORD || '';
 const ignore_topics = process.env.JANDI_IGNORE_TOPICS.split(',') || '';
 const ignore_chats  = process.env.JANDI_IGNORE_CHATS.split(',') || '';
 const download = process.env.JANDI_DOWNLOAD || '';
-const NUM_PAGEUP = 3;
+const headless = process.env.JANDI_HEADLESS || 'false';
+const NUM_PAGEUP = 5;
 const MAX_RETRY  = 5;
 const SLEEP_MINOR = 100;
 const SLEEP_MAJOR = 1000;
 let _messages = {}; 
+
+
+const {Builder, By, Key, until} = require(webdriver);
+const chrome = require((isWin)? webdriver + '\\chrome': webdriver + '/chrome');
+
 
 /////////////////////////////////////////////
 // Download path create
@@ -25,7 +33,8 @@ console.log(download)
 
 options   = new chrome.Options();
 //options.addArguments('headless'); // note: without dashes
-options.addArguments('head');
+options.addArguments((headless=='true')? 'headless':'head');
+//options.addArguments('headless');
 options.addArguments('disable-gpu');
 options.setUserPreferences( {'download.default_directory': download, "profile.default_content_setting_values.automatic_downloads" : 1} );
 
