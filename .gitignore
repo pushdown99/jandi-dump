@@ -2,6 +2,7 @@ node_modules/
 .env
 download/
 output/
-backup/
 bin/
 *.exe
+backup/
+selenium-webdriver/

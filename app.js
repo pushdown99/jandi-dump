@@ -52,6 +52,16 @@ async function pressPagUpKey (count=5) {
     for (var i = 0; i < count; i++) { await actions.sendKeys(Key.PAGE_UP); await driver.sleep (SLEEP_MINOR); }
 }
 
+function dict2json (f, d) {
+    fs.writeFileSync(f, JSON.stringify (Object.values(d), null, 2));
+}
+
+function dict2text (f, d) {
+    for (const [key, value] of Object.entries(d)) {
+        console.log(key, value);
+      }
+    fs.writeFileSync(f, JSON.stringify (Object.values(d), null, 2));
+}
 async function topicRoomEntrance (topicId, topicNm) {
     _messages = {}; 
     await driver.findElement (By.id (topicId)).click()
@@ -111,6 +121,9 @@ async function topicRoomEntrance (topicId, topicNm) {
     _messages = sortOnKeys(_messages);
     
     fs.writeFileSync(path.join(output, topicNm + '.json'), JSON.stringify (Object.values(_messages), null, 2));
+    dict2json (path.join(output, topicNm + '.json'), _messages);
+    dict2text (path.join(output, topicNm + '.txt' ), _messages);
+
 
     await driver.sleep (SLEEP_MAJOR); 
 }
