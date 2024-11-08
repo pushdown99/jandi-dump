@@ -1,24 +1,32 @@
 {
-  "name": "jandi",
+  "name": "jandi-dump",
   "version": "1.0.0",
   "main": "app.js",
   "scripts": {
+    "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "pkg ."
+    "clean": "del-cli --force output download build",
+    //"build": "ncc build -o build/lib app.js && pkg --target node16-win-x64 -o bin/jandi-dump.exe ./build/lib/index.js"
+    "build": "nexe app.js"
   },
   "bin": {
-    "app": "./bin"
+    "bin": "app.js"
   },
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "dotenv": "^16.4.5",
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7",
-    "selenium-webdriver": "^4.26.0"
-  },
+  "type": "commonJS",
   "description": "",
   "devDependencies": {
-    "pkg": "^5.8.1"
+    "@vercel/ncc": "^0.38.2",
+    "chromedriver": "^130.0.4",
+    "del-cli": "^6.0.0",
+    "dotenv": "^16.4.5",
+    "fs": "^0.0.1-security",
+    "geckodriver": "^5.0.0",
+    "nexe": "^4.0.0-rc.6",
+    "path": "^0.12.7",
+    "pdfkit": "^0.15.1",
+    "pkg": "^5.8.1",
+    "selenium-webdriver": "^4.26.0"
   }
 }

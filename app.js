@@ -1,18 +1,36 @@
-//const {Builder, By, Key, until} = require('D:\\workspaces\\node\\jandi\\node_modules\\selenium-webdriver');
+// Compile-time configuration for executable binary build.
+const _isWin     = process.platform === "win32";
+const _workspace = process.cwd ();
+
+//const _isWin     = true;
+//const _workspace = 'C:\\jandi-dump';
+
+const fs   = require ('fs');
+const path = require ('path');
+const pdf  = require ('pdfkit');
+
+//let _modules   = _isWin ? _workspace+'\\node_modules': _workspaces+'/node_modules';
+//let _webdriver = _isWin ? _modules+'\\selenium-webdriver': _modules+'/selenium-webdriver';
+//let _chrome    = _isWin ? _webdriver+'\\chrome': _webdriver+'/chrome';
+const _modules   = path.resolve(path.join(_workspace, 'node_modules'));
+const _webdriver = path.resolve(path.join(_modules, 'selenium-webdriver'));
+const _chrome    = path.resolve(path.join(_webdriver, 'chrome'));
+
+
+//require(_isWin ? _modules + '\\dotenv': _modules + '/dotenv').config();
 require('dotenv').config();
 
-const fs = require('fs');
-const path = require ('path');
+//const fs   = require (_isWin ? _modules + '\\fs': _modules + '/fs');
+//const path = require (_isWin ? _modules + '\\path': _modules + '/path');
+//const pdf  = require (_isWin ? _modules + '\\pdfkit': _modules + '/pdfkit');
 
-let isWin = process.platform === "win32";
-const pwd = process.cwd();
-const workspace = process.env.JANDI_WORKSPACE || '';
-const webdriver = path.join(workspace, 'selenium-webdriver');
-const username = process.env.JANDI_USERNAME || 'root';
-const password = process.env.JANDI_PASSWORD || '';
+//const workspace = process.env.JANDI_WORKSPACE || '';
+const username      = process.env.JANDI_USERNAME || '';
+const password      = process.env.JANDI_PASSWORD || '';
 const ignore_topics = process.env.JANDI_IGNORE_TOPICS.split(',') || '';
 const ignore_chats  = process.env.JANDI_IGNORE_CHATS.split(',') || '';
-const headless = process.env.JANDI_HEADLESS || 'false';
+const headless      = process.env.JANDI_HEADLESS || 'false';
+
 const NUM_PAGEUP = 5;
 const MAX_RETRY  = 5;
 const SLEEP_MINOR = 100;
@@ -20,11 +38,18 @@ const SLEEP_MAJOR = 1000;
 let _messages = {}; 
 
 
-const {Builder, By, Key, until} = require(webdriver);
-const chrome = require((isWin)? webdriver + '\\chrome': webdriver + '/chrome');
+// RUN TIME
+//const webdriver = path.join(workspace, 'node_modules', 'selenium-webdriver');
+const chrome    = require(_chrome);
+const {Builder, By, Key, until} = require(_webdriver);
 
-const download = path.join (workspace, 'download');
-const output   = path.join (workspace, 'output');
+// COMPILE TIME
+//const {Builder, By, Key, until} = require('C:\\jandi-dump\\node_modules\\selenium-webdriver');
+//const chrome    = require('C:\\jandi-dump\\\\node_modules\\selenium-webdriver\\chrome');
+
+const download = path.join (_workspace, 'download');
+const output   = path.join (_workspace, 'output');
+const bin      = path.join (_workspace, 'bin');
 
 if (!fs.existsSync(download)) { fs.mkdirSync(download, { recursive: true }); }
 if (!fs.existsSync(output))   { fs.mkdirSync(output,   { recursive: true }); }
@@ -57,11 +82,40 @@ function dict2json (f, d) {
 }
 
 function dict2text (f, d) {
-    for (const [key, value] of Object.entries(d)) {
-        console.log(key, value);
-      }
-    fs.writeFileSync(f, JSON.stringify (Object.values(d), null, 2));
+    let data = [];
+    for (const [key, {type, name, time, msg}] of Object.entries(d)) {
+        if(type == 'sys') {
+            data.push ('[' + msg + ']\n');
+        }
+        else {
+            data.push (name + ' (' + time + ')\n' + msg + '\n');
+        }
+    }
+    var fp = fs.createWriteStream(f);
+    data.forEach(value => fp.write(`${value}`+'\n'));
+    fp.close();
 }
+
+function dict2pdf (f, d) {
+    const doc = new pdf({ size: "A4", font: "font/Pretendard-Regular.ttf" });
+    doc.fontSize(10);
+
+    doc.pipe(fs.createWriteStream(f));
+    for (const [key, {type, name, time, msg}] of Object.entries(d)) {
+        if(type == 'sys') {
+            doc.text (`[${msg}]`,{ align: 'left' });
+            doc.moveDown ();
+        }
+        else {
+            doc.text (`${name} (${time})`,{ align: 'left' });
+            doc.text (`${msg}`,{ align: 'left' });
+            doc.moveDown ();
+        }
+    }
+    doc.flushPages();
+    doc.end ();
+}
+
 async function topicRoomEntrance (topicId, topicNm) {
     _messages = {}; 
     await driver.findElement (By.id (topicId)).click()
@@ -120,9 +174,10 @@ async function topicRoomEntrance (topicId, topicNm) {
     }
     _messages = sortOnKeys(_messages);
     
-    fs.writeFileSync(path.join(output, topicNm + '.json'), JSON.stringify (Object.values(_messages), null, 2));
+    //fs.writeFileSync(path.join(output, topicNm + '.json'), JSON.stringify (Object.values(_messages), null, 2));
     dict2json (path.join(output, topicNm + '.json'), _messages);
     dict2text (path.join(output, topicNm + '.txt' ), _messages);
+    dict2pdf  (path.join(output, topicNm + '.pdf' ), _messages);
 
 
     await driver.sleep (SLEEP_MAJOR); 
